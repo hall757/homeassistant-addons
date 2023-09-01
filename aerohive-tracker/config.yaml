@@ -23,13 +23,13 @@ options:
   ignore_regex_ip: ""
   ignore_regex_name: ""
 schema:
-  aerohive_password: 'str'
+  aerohive_password: 'password'
   aerohive_host: 'str'
   aerohive_username: 'str'
   mqtt_host: 'str'
   mqtt_port: 'int'
   mqtt_username: 'str'
-  mqtt_password: 'str'
+  mqtt_password: 'password'
   mqtt_topic: 'str'
   preinit_macs: 'str'
   ignore_regex_mac: 'str'
