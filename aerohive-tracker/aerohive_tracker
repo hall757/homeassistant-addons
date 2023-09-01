@@ -1,0 +1,251 @@
+#!/usr/bin/python3
+
+#use_flask=False
+#
+#if use_flask:
+#  from flask import Flask, jsonify, request
+#  from threading import Thread
+#  app = Flask(__name__)
+
+from paho.mqtt import client as mqtt_client
+import paho.mqtt.publish as publish
+
+import os,random
+import aeromiko
+import time
+from datetime import datetime
+import yaml
+import json
+import logging
+import socket
+import sys
+import re
+from operator import itemgetter
+from pprint import pprint
+
+_LOGGER = logging.getLogger(__name__)
+"""Unless changed, the acount used by default is admin"""
+
+with open('/data/options.json', 'r') as file:
+  options = json.load(file)
+
+FIRST_RECONNECT_DELAY = 1
+RECONNECT_RATE = 2
+MAX_RECONNECT_COUNT = 12
+MAX_RECONNECT_DELAY = 60
+broker        = options["mqtt_host"]
+port          = options['mqtt_port']
+topic         = options['mqtt_topic']
+mqtt_username = options['mqtt_username']
+mqtt_password = options['mqtt_password']
+preinit_macs  = options['preinit_macs'].split(',')
+username      = options['aerohive_username']
+hosts         = options['aerohive_host'].split(',')
+password      = options['aerohive_password']
+default_regex = re.compile('^$')
+try:
+  ignore_regex_mac =re.compile(options['ignore_regex_mac' ])
+except:
+  ignore_regex_mac =default_regex
+try:
+  ignore_regex_ip  =re.compile(options['ignore_regex_ip'  ])
+except:
+  ignore_regex_ip  =re.default_regex
+try:
+  ignore_regex_name=re.compile(options['ignore_regex_name'])
+except:
+  ignore_regex_name=re.default_regex
+aps           = {} # keys=mac, values=AP
+connected     = {} # keys=mac, values=boolean
+client_id = f'python-mqtt-{random.randint(0, 1000)}'
+
+def create_discovery_record(topic, device):
+    entity_config = {}
+    entity_config['name'] = device['name']
+    entity_config['unique_id'] = device['mac'].replace(":","")+"_aerohive_device_tracker"
+    entity_config['state_topic'] = topic + '/0x'+device['mac'].replace(":","")+'/state' 
+    entity_config['json_attributes_topic'] = topic + '/0x'+device['mac'].replace(":","")+'/attributes'
+    entity_config['payload_home'] = 'home'
+    entity_config['payload_not_home'] = 'not_home'
+    entity_config['source_type'] = 'router'
+    entity_config['device']={}
+    entity_config['device']['identifiers']='Aerohive'
+    entity_config['device']['name']='Aerohive'
+    #entity_config['device']['connections']=['ap',device['ap']]
+    entity_config['device_class']='device_tracker'
+    entity_config['device']['manufacturer']='Aerohive'
+
+    return json.dumps(entity_config)
+
+
+def on_disconnect(client, userdata, rc):
+    logging.info("Disconnected with result code: %s", rc)
+    reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
+    while reconnect_count < MAX_RECONNECT_COUNT:
+        logging.info("Reconnecting in %d seconds...", reconnect_delay)
+        time.sleep(reconnect_delay)
+        try:
+            client.reconnect()
+            logging.info("Reconnected successfully!")
+            return
+        except Exception as err:
+            logging.error("%s. Reconnect failed. Retrying...", err)
+
+        reconnect_delay *= RECONNECT_RATE
+        reconnect_delay = min(reconnect_delay, MAX_RECONNECT_DELAY)
+        reconnect_count += 1
+    logging.info("Reconnect failed after %s attempts. Exiting...", reconnect_count)
+
+def connect_mqtt():
+    def on_connect(client, userdata, flags, rc):
+        if rc == 0:
+            print("Connected to MQTT Broker!")
+        else:
+            print("Failed to connect, return code %d\n", rc)
+    # Set Connecting Client ID
+    client = mqtt_client.Client(client_id)
+    client.username_pw_set(mqtt_username, mqtt_password)
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
+    client.connect(broker, port)
+    return client
+
+# public device payload and discovery payload for a device
+def publish(client,d):
+    global discovery_published
+    try:
+        # always publich home/not_home status for all devices seen since startup
+        # this is not retained
+        result = client.publish(
+            f"{topic}/0x{d['mac'].replace(':','')}/state",
+            d['state'],
+            retain=0,qos=0)
+        if d['state']=="home":
+          # only publish device payload when device is home
+          # this is retained so you can tell the last AP a device connected to
+          payload=json.dumps(d)
+          result = client.publish(
+            f"{topic}/0x{d['mac'].replace(':','')}/attributes",
+            payload,
+            retain=1,qos=0)
+          # publish the discovery record only when device payload changes
+          # this is retained so homeassistant always remembers the device
+          if (discovery_published.get(d['mac']) is None) or (discovery_published[d['mac']] != payload):
+            discovery_topic="homeassistant/"+topic+"/0x"+d['mac'].replace(":","")+"/config"
+            result = client.publish(
+              discovery_topic,create_discovery_record(topic,d),retain=1,qos=0)
+            discovery_published[d['mac']]=payload
+          # result: [0, 1]
+          #status = result[0]
+          #if status == 0:
+          #    print(f"Send home to topic {topic}/{mac}")
+          #else:
+          #    print(f"Failed to send message to topic {topic}")
+    except:
+        print("fail")
+        return None
+
+def scan_devices():
+        """Scan for new devices and return a list with found device IDs."""
+        result = _get_update()
+        if result:
+            last_results = sorted(list(result.values()),key=itemgetter('ip'))
+        return last_results
+
+def get_device_name(device):
+        """Return the name of the given device or None if we don't know."""
+        try:
+          return last_results[device]['name']
+        except:
+          return None
+
+def _connect():
+        """ Connect to the Aerohive AP SSH server. """
+        """ Support comma separated list of hosts, a thread will be created """
+        """ for each AP. All APs assumed to be part of the same hive, """
+        """ therefore use same user/pass """
+        for host in hosts:
+          try:
+            aps[host]=aeromiko.AP(host, username, password)
+            aps[host].connect()
+            connected[host] = True
+          except:
+            _LOGGER.error("Connection failed")
+            aps[host].disconnect()
+            aps[host]=None
+            connected[host] = False
+
+def _get_update():
+
+        results = last_results
+        for key in list(results.keys()):
+          results[key]['state']='not_home'
+        for host in hosts: # For each host 
+          if not connected[host]: # If not already connected
+            _connect() # Attempt to connect
+          if not connected[host]: # otherwise
+            return None # skip host and continue with next host 
+          for station in aps[host].show_station(): # for each wireless stations connected to AP
+            ip     = station['IP_ADDR' ] # record ip and mac
+            if ip != '0.0.0.0':
+              octets = station['MAC_ADDR']
+              mac    = octets[0:2]+':'+octets[2:7]+':'+octets[7:12]+':'+octets[12:14]
+              try:
+                """Return only up to the first dot, unless returned name is the IP"""
+                hostname=socket.gethostbyaddr(ip)[0] # Try and resolve hostname 
+                if hostname != ip:
+                  hostname=hostname.split('.')[0] # store resolved hostname in record
+              except:
+                hostname=None # hostname could not be resolved from IP
+              """Store the mac and associated hostname in the result"""  
+              if hostname != ip:
+                results[mac]={ 'name':hostname }
+                results[mac]['ip']=ip
+                results[mac]['ap']=socket.gethostbyaddr(host)[0]
+                results[mac]['mac']=mac
+                results[mac]['state']='home'
+        return results
+
+last_results={}
+for mac in preinit_macs:
+  last_results[mac]={"mac":mac,"state":"not_home"}
+  for key in ["name","ip","ap"]:
+    last_results[mac][key]="unknown"
+
+scanned_devices={}
+discovery_published={}
+def update_mqtt(client,devices):
+  for device in devices:
+    publish(client,device)
+
+
+def task():
+  global scanned_devices
+  client = connect_mqtt()
+  client.loop_start()
+  for host in hosts: # initialize conncted stats
+    connected[host]=False
+  _connect() # connect to all APs
+  while True:
+#    try:
+      scanned_devices=scan_devices()
+      update_mqtt(client,scanned_devices)
+#    except:
+#      None
+      time.sleep(30)
+
+#if use_flask:
+#  thread = Thread(target=task)
+#  thread.start()
+#else:
+
+task()
+
+#if use_flask:
+#  @app.route('/devices')
+#  def get_devices():
+#    return jsonify(scanned_devices)
+
+
+
+

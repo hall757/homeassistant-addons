@@ -1,0 +1,38 @@
+configuration:
+  aerohive_host: 
+    name: Aerohive Device list
+    description: Comma separated list of all aerohive devices in the hive to monitor.
+  aerohive_username:
+    name: Aerohive Devices username
+    description: Username of admin user on aerohive devices.  Defaults to admin.
+  aerohive_password:
+    name: Aerohive Devices password
+    description: Password of aerohive devices.  Assumes all devices in the same hive and therfore have the same password.
+  mqtt_host:
+    name: MQTT Host
+    description: MQTT Broker.  Defaults to localhost
+  mqtt_port:
+    name: MQTT Port
+    description: MQTT Port.  Defaults to 1883
+  mqtt_username:
+    name: MQTT Username
+    description: MQTT Username
+  mqtt_password:
+    name: MQTT Password
+    description: MQTT Password
+  mqtt_topic:
+    name: MQTT Topic
+    description: Where the records will be published on the broker.  Defaults device_scanner/aerohive.
+  preinit_macs:
+    name: MAC addresses to pre-populate
+    description: Used for macs not normally at home.  Comma separated lists of lowercase macs in the format xx:xx:xx:xx:xx:xx. Prevents not_home devices from showing as unavailable when addon is restarted
+  ignore_regex_mac:
+    name: MAC Address ignore regex
+    description: Regular expression to ignore MAC addresses
+  ignore_regex_ip:
+    name: IP Address ignore regex
+    description: Regular expression to ignore IP addresses
+  ignore_regex_name:
+    name: Name ignore regex
+    description: Regular expression to ignore device names
+    
