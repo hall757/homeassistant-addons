@@ -1,6 +1,6 @@
-# https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
+  # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
 name: Aerohive Device Tracker
-version: "1.0.2"
+version: "1.0.3"
 slug: aerohive_tracker
 description: Track WiFi devices accross multiple APs of an Aerohive mesh network.  Only wireless devices are tracked.
 arch:
@@ -22,6 +22,8 @@ options:
   ignore_regex_mac: ""
   ignore_regex_ip: ""
   ignore_regex_name: ""
+  ignore_unnamed_hosts: "True"
+  sleep_interval: "30"
 schema:
   aerohive_password: 'password'
   aerohive_host: 'str'
@@ -35,3 +37,5 @@ schema:
   ignore_regex_mac: 'str'
   ignore_regex_ip: 'str'
   ignore_regex_name: 'str'
+  ignore_unnamed_hosts: 'bool'
+  sleep_intercal: 'int'

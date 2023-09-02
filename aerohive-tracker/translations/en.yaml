@@ -35,4 +35,9 @@ configuration:
   ignore_regex_name:
     name: Name ignore regex
     description: Regular expression to ignore device names
-    
+  ignore_unnamed_hosts:
+    name: Ignore unnamed hosts.  If true, a wireless client requires a reverse dns record to be reported.  Defaults to True.
+  sleep_interval:
+    name: Sleep interval
+    description: The number of seconds to wait between each scan and report cycle.  Default to 30 seconds.
+        

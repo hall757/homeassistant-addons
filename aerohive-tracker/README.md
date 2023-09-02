@@ -1,6 +1,8 @@
-# Home Assistant Add-on: Example add-on
+# Home Assistant Add-on: Aerohive Tracker
 
-_Example add-on to use as a blueprint for new add-ons._
+Device tracker that can monitor multiple Aerohive access points for wireless devices and publish home/not_home status to an MQTT broker.
+
+Access points are queried in parallel threads.
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]

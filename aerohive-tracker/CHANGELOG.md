@@ -1,6 +1,9 @@
-## 1.0.1
+# Changelog
 
-- Latest release
+## 1.0.3
+
+- Documentation
+- Code cleanup
 
 ## 1.0.0
 
