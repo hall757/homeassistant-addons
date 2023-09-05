@@ -38,4 +38,4 @@ schema:
   ignore_regex_ip: 'str'
   ignore_regex_name: 'str'
   ignore_unnamed_hosts: 'bool'
-  sleep_intercal: 'int'
+  sleep_interval: 'int'

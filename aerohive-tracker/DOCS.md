@@ -6,7 +6,7 @@ Author: Randy Hall [randy.hall@open-source.guru](mailto:randy.hall@open-source.g
 
 - Easy deployment as a homeassistant add-on.
 - All configuration is done within the config page of the add-on.
-- Threaded operation that allows multiple access point to be queried concurrently.  This should scale well.  I see no difference in performance between one access point or 10 access points.
+- Persistant connections that allows multiple access point to be queried quickly.  I see almost no difference in performance between one access point or 10 access points.
 - Posts status and homeassistant discovery records to mqtt broker.
 - Tracks clients by wireless connecton, not MAC address.  Wired devices will never be reported.
 - Set regular expression exclusions based on IP, MAC, or hostname of wireless devices.

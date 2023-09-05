@@ -9,7 +9,7 @@ from pprint import pprint
 
 def read_options():
   options={}
-  for opt_file in ["/data/options.json","./options.json"]:
+  for opt_file in ["./options.json","/data/options.json"]:
     try:
       print("getting options from "+opt_file)
       with open(opt_file, 'r') as f:
@@ -96,7 +96,7 @@ def publish(client,d):
   # always publich home/not_home status for all devices seen since startup
   # this is not retained
   result = client.publish(
-      f"{topic}/0x{d['mac'].replace(':','')}/state",
+      f"{options['mqtt_topic']}/0x{d['mac'].replace(':','')}/state",
       d['state'],
       retain=0,qos=0)
       
@@ -105,7 +105,7 @@ def publish(client,d):
     # this is retained so you can tell the last AP a device connected to
     payload=json.dumps(d)
     result = client.publish(
-      f"{topic}/0x{d['mac'].replace(':','')}/attributes",
+      f"{options['mqtt_topic']}/0x{d['mac'].replace(':','')}/attributes",
       payload,
       retain=1,qos=0)
 
@@ -117,9 +117,9 @@ def publish(client,d):
     # publish the discovery record only when device payload changes
     # this is retained so homeassistant always remembers the device
     if (discovery_published.get(d['mac']) is None) or (discovery_published[d['mac']] != payload):
-      discovery_topic="homeassistant/"+topic+"/0x"+d['mac'].replace(":","")+"/config"
+      discovery_topic="homeassistant/"+options['mqtt_topic']+"/0x"+d['mac'].replace(":","")+"/config"
       result = client.publish(
-        discovery_topic,create_discovery_record(topic,d),retain=1,qos=0)
+        discovery_topic,create_discovery_record(options['mqtt_topic'],d),retain=1,qos=0)
       discovery_published[d['mac']]=payload
     # result: [0, 1]
     #status = result[0]
@@ -132,7 +132,8 @@ def scan_devices():
         """Scan for new devices and return a list with found device IDs."""
         result = _get_update()
         if result:
-            last_results = sorted(list(result.values()),key=itemgetter('ip'))
+            #last_results = sorted(list(result.values()),key=itemgetter('ip'))
+            last_results = result.copy()
         return last_results
 def get_device_name(device):
         global last_results
@@ -148,25 +149,21 @@ def _connect():
         """ therefore use same user/pass """
         for host in aerohive_hosts:
           try:
-            print("establishing ssh connection to ap "+host)
+            print("establishing ssh connection to ap "+options['aerohive_username']+"@"+host)
             aps[host]=aeromiko.AP(host, options['aerohive_username'], options['aerohive_password'])
-            if aps[host].connect() == None:
-              print("ssh connection to "+host+" failed.")
-              connected[host] = False
-            else:
-              connected[host] = True
+            aps[host].connect()
+            connected[host] = True
           except:
-            print("ssh connection to "+host+" failed.")
-            #aps[host].disconnect()
+            print("ssh connection to "+host+" failed with "+options['aerohive_password'])
             aps[host]=None
             connected[host] = False
 def _get_update():
-
-        results = last_results
+        global last_results
+        results = last_results.copy()
         for key in list(results.keys()):
           results[key]['state']='not_home'
         for host in aerohive_hosts: # For each host
-          print("scanning ap "+host)
+          #print("scanning ap "+host)
           try:
             ap_hostname=socket.gethostbyaddr(host)[0]
           except:
@@ -188,33 +185,54 @@ def _get_update():
               except:
                 hostname=None # hostname could not be resolved from IP
               """Store the mac and associated hostname in the result"""  
-              if hostname != ip:
+              if True: #hostname != ip:
                 results[mac]={ 'name':hostname }
                 results[mac]['ip']=ip
                 results[mac]['ap']=ap_hostname
                 results[mac]['mac']=mac
                 results[mac]['state']='home'
-                results[max]['lastseen']=int(datetime.now().timestamp())
+                results[mac]['lastseen']=int(datetime.now().timestamp())
         return results
 def update_mqtt(client,devices):
-  for device in devices:
+  for mac in devices:
+    device=devices[mac]
     ignore=False
-    try:
-      if (re.match(ignore_regex_mac,device['mac']) or
-          re.match(ignore_regex_name,device['name']) or
-          re.match(ignore_regex_ip,device['ip'])):
-        ignore=True
-    except:
-      ignore=False
+    #if (re.match(ignore_regex_mac,device['mac']) or
+    #    re.match(ignore_regex_name,device['name']) or
+    #    re.match(ignore_regex_ip,device['ip'])):
+    #  ignore=True
     if ignore:
       break
     publish(client,device)
+def seed_mac(mac):
+  global last_results
+  print('Seeding '+mac)
+  last_results[mac]={
+    "mac":mac,
+    "state":"not_home",
+    "name":"unknown",
+    "ip":"unknown",
+    "ap":"unknown"
+  }
+
+def on_message(client, userdata, msg):
+  global last_results
+  try:
+    payload=json.loads(str(msg.payload.decode("utf-8")))
+    mac=payload['mac']
+    last_results[mac]=payload
+  except:
+    mac=''
+
 def task():
   global scanned_devices
   print("Opening connection to mqtt broker "+options["mqtt_host"]+":"+str(options["mqtt_port"]))
   try:
     client = connect_mqtt()
+    client.on_message = on_message
+    client.subscribe("device_tracker/aerohive/#")
     client.loop_start()
+    
   except:
     print("Failed to connect to mqtt broker "+options["mqtt_host"]+":"+str(options["mqtt_port"])+".  Exiting...")
     return
@@ -222,13 +240,13 @@ def task():
   for host in aerohive_hosts: # initialize conncted stats
     connected[host]=False
   _connect() # connect to all APs
+  client.unsubscribe("device_tracker/aerohive/#")
+  client.on_message = None
+  print('Starting scan loop')
   while True:
-    try:
-      scanned_devices=scan_devices()
-      update_mqtt(client,scanned_devices)
-    except:
-      print("failed update loop.")
-    print("Sleeping for "+str(options['sleep_interval'])+" seconds.")
+    scanned_devices=scan_devices()
+    update_mqtt(client,scanned_devices)
+    #print("Sleeping for "+str(options['sleep_interval'])+" seconds.")
     time.sleep(options['sleep_interval'])
 
 options            = read_options()
@@ -243,12 +261,6 @@ scanned_devices    = {}
 discovery_published= {}
 last_results       = {}
 for mac in options['preinit_macs'].split(','):
-  last_results[mac]={
-    "mac":mac,
-    "state":"not_home",
-    "name":"unknown",
-    "ip":"unknown",
-    "ap":"unknown"
-  }
+  seed_mac(mac)
 
 task()
