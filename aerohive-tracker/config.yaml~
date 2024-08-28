@@ -4,11 +4,11 @@ version: "1.0.4"
 slug: aerohive_tracker
 description: Track WiFi devices accross multiple APs of an Aerohive mesh network.  Only wireless devices are tracked.
 arch:
-  #  - armhf
-  #- armv7
+  - armhf
+  - armv7
   - aarch64
-  #- amd64
-  #- i386
+  - amd64
+  - i386
 options:
   aerohive_password: ""
   aerohive_host: ""

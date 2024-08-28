@@ -293,7 +293,6 @@ def task():
       print("     topic: "+   prefixtopic(d))
       result = client.publish(    prefixtopic(d)+"/config"    , None, retain=1,qos=0)
       result = client.publish(    prefixtopic(d)+"/attributes", None, retain=1,qos=0)
-      result = client.publish(    prefixtopic(d)+"/lastseentime",None, retain=1,qos=0)
       result = client.publish(    prefixtopic(d)+"/state"     , None, retain=1,qos=0)
       result = client.publish(    prefixtopic(d)              , None, retain=1,qos=0)
 
