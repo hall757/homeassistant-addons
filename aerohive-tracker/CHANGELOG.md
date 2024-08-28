@@ -2,8 +2,7 @@
 
 ## 1.0.4
 
-- It's working
-- IP, mac and name filters are currently not working
+- Fixed regex exclusions
 
 ## 1.0.3
 

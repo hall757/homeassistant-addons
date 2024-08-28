@@ -6,7 +6,7 @@ Author: Randy Hall [randy.hall@open-source.guru](mailto:randy.hall@open-source.g
 
 - Easy deployment as a homeassistant add-on.
 - All configuration is done within the config page of the add-on.
-- Persistant connections that allows multiple access point to be queried quickly.  I see almost no difference in performance between one access point or 10 access points.
+- Threaded operation that allows multiple access point to be queried while keeping the ssh session open.  This should scale well.  I see no difference in performance between one access point or 10 access points.
 - Posts status and homeassistant discovery records to mqtt broker.
 - Tracks clients by wireless connecton, not MAC address.  Wired devices will never be reported.
 - Set regular expression exclusions based on IP, MAC, or hostname of wireless devices.
@@ -31,9 +31,9 @@ Author: Randy Hall [randy.hall@open-source.guru](mailto:randy.hall@open-source.g
 | mqtt_password        |                         | MQTT Password. Defaults to assuming no auth required         |
 | mqtt_topic           | device_tracker/aerohive | Where the records will be published on the broker.           |
 | preinit_macs         |                         | Comma separated lists of lowercase macs in the format xx:xx:xx:xx:xx:xx. Prevents not_home devices from showing as Unavailable when addon is restarted.  Optional |
-| ignore_regex_mac     | ^$                      | Regular expression to ignore MAC addresses. Optional         |
-| ignore_regex_ip      | ^$                      | Regular expression to ignore IP addresses. Optionsl          |
-| ignore_regex_name    | ^$                      | Regular expression to ignore device names. Optional          |
+| ignore_regex_mac     | a^                      | Regular expression to ignore MAC addresses. Optional         |
+| ignore_regex_ip      | a^                      | Regular expression to ignore IP addresses. Optionsl          |
+| ignore_regex_name    | a^                      | Regular expression to ignore device names. Optional          |
 | ignore_unnamed_hosts | True                    | If a reverse DNS lookup of a client IP address does not return a name and this value is True, the client will be excluded from reporting. |
 | sleep_interval       | 30                      | he number of seconds to wait between each scan and report cycle. |
 
