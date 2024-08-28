@@ -45,4 +45,3 @@ schema:
   mqtt_reconnect_rate: 'int'
   mqtt_max_reconnect_count: 'int'
   mqtt_max_reconnect_delay: 'int'
-}
