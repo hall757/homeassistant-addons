@@ -130,7 +130,6 @@ def publish(client,d):
     # this is retained so you can tell the last AP a device connected to
     d2=d.copy()
     d2.pop('state',None)
-    d2.pop('mac',None)
     d2.pop('lastseentime',None)
     payload=json.dumps(d2)
     result = client.publish(
