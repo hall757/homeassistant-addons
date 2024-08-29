@@ -108,7 +108,10 @@ def publish(client,d):
   # this is not retained
   prefix= prefixtopic(d)
   #print(prefix)
-  result = client.publish( prefix+"/state", d['state'], retain=0,qos=0)
+  try:
+      result = client.publish( prefix+"/state", d['state'], retain=0,qos=0)
+  except:
+      None
   try:
       result = client.publish( prefix+"/lastseentime", d['lastseentime'], retain=1,qos=0)
   except:  
@@ -262,7 +265,7 @@ def purge_ignored_devices(client):
       print(d)
       print("     topic: "+prefixtopic(d))
       for key in ['/config','/attributes','/lastseentime','/state','/away_time','']:
-        result = client.publish( prefixtopic(d)+key,None,retain=0,qos=0)
+        result = client.publish( prefixtopic(d)+key,None,retain=1,qos=0)
 
 def task():
   global scanned_devices

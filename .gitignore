@@ -1,5 +1,10 @@
 aerohive-tracker/ha
 aerohive-tracker/*~
+aerohive-tracker/.*~
+aerohive-tracker/translations/*~
+aerohive-tracker/translations/.*~
+.*~
+*~
 options.json
 # Byte-compiled / optimized / DLL files
 __pycache__/
