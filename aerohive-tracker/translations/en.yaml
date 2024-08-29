@@ -22,7 +22,7 @@ configuration:
     description: MQTT Password
   preinit_macs:
     name: MAC addresses to pre-populate
-    description: Used for macs not normally at home.  Comma separated lists of lowercase macs in the format xx:xx:xx:xx:xx:xx. Prevents not_home devices from showing as unavailable when addon is restarted
+    description: Used for macs not normally at home.  Comma separated lists of lowercase macs in the format xx:xx:xx:xx:xx:xx. Prevents not_home devices from showing as unavailable when addon is restarted.  Macs listed here will not be filtered even if matched by one of the exclusions.
   ignore_regex_mac:
     name: MAC Address ignore regex
     description: Regular expression to ignore MAC addresses. Use a^ to ignore nothing.
@@ -36,7 +36,10 @@ configuration:
     name: Ignore unnamed hosts.  If true, a wireless client requires a reverse dns record to be reported.  Defaults to True.
   sleep_interval:
     name: Sleep interval
-    description: The number of seconds to wait between each scan and report cycle.  Default to 30 seconds.
+    description: The number of seconds to wait between each scan and report cycle.  Default to 15 seconds.
+  away_delay:
+    name: Away delay
+    descriptions: Number of seconds after device loss to consider as away.  Defaults to 300 seconds.
   mqtt_first_reconnect_delay: 
     name: MQTT first reconnect delay
     description: MQTT tuning parameter

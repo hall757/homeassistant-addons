@@ -22,20 +22,20 @@ def read_options():
   options.setdefault('aerohive_password'   ,'')
   options.setdefault('aerohive_username'   ,'admin')
   options.setdefault('preinit_macs'        ,'')
-  options.setdefault('mqtt_topic'          ,'device_tracker/aerohive')
   options.setdefault('mqtt_host'           ,'localhost')
   options.setdefault('mqtt_password'       ,'')
   options.setdefault('mqtt_username'       ,'')
   options.setdefault('ignore_unnamed_hosts',True)
-  options.setdefault('ignore_regex_mac'    ,'^$')
-  options.setdefault('ignore_regex_ip'     ,'^$')
-  options.setdefault('ignore_regex_name'   ,'^$')
-  options.setdefault('sleep_interval'           ,30)
+  options.setdefault('ignore_regex_mac'    ,'a^')
+  options.setdefault('ignore_regex_ip'     ,'a^')
+  options.setdefault('ignore_regex_name'   ,'a^')
+  options.setdefault('sleep_interval'           ,15)
   options.setdefault('mqtt_port'              ,1883)
   options.setdefault('mqtt_first_reconnect_delay',1)
   options.setdefault('mqtt_reconnect_rate'       ,2)
   options.setdefault('mqtt_max_reconnect_count' ,12)
   options.setdefault('mqtt_max_reconnect_delay' ,60)
+  options.setdefault('away_delay'              ,300)
   for key in ['aerohive_host','aerohive_password']:
     if options[key]=='':
       print(key+" cannot be blank.  Terminating...")
@@ -130,7 +130,6 @@ def publish(client,d):
     # this is retained so you can tell the last AP a device connected to
     d2=d.copy()
     d2.pop('state',None)
-    d2.pop('mac',None)
     d2.pop('lastseentime',None)
     payload=json.dumps(d2)
     result = client.publish(
@@ -155,6 +154,7 @@ def publish(client,d):
     #    print(f"Send home to topic {topic}/{mac}")
     #else:
     #    print(f"Failed to send message to topic {topic}")  
+
 def scan_devices():
         global last_results
         """Scan for new devices and return a list with found device IDs."""
@@ -163,6 +163,7 @@ def scan_devices():
             #last_results = sorted(list(result.values()),key=itemgetter('ip'))
             last_results = result.copy()
         return last_results
+
 def get_device_name(device):
         global last_results
         """Return the name of the given device or None if we don't know."""
@@ -170,6 +171,7 @@ def get_device_name(device):
           return last_results[device]['name']
         except:
           return None
+
 def _connect():
         """ Connect to the Aerohive AP SSH server. """
         """ Support comma separated list of hosts, a thread will be created """
@@ -185,11 +187,18 @@ def _connect():
             print("ssh connection to "+host+" failed") #  with "+options['aerohive_password'])
             aps[host]=None
             connected[host] = False
+
 def _get_update():
         global last_results
         results = last_results.copy()
         for key in list(results.keys()):
-          results[key]['state']='not_home'
+          try:
+            away_time = int(datetime.now().timestamp()) - results[key]['lastseen']
+          except:
+            away_time = options['away_delay']+1
+          results[key]['away_time']=away_time
+          if away_time > options['away_delay']:
+            results[key]['state']='not_home'
         for host in aerohive_hosts: # For each host
           #print("scanning ap "+host)
           try:
@@ -221,6 +230,7 @@ def _get_update():
                   nowtime=datetime.now()
                   results[mac]['lastseentime']=nowtime.strftime("%m/%d/%Y, %H:%M:%S")
                   results[mac]['lastseen']=int(nowtime.timestamp())
+                  results[mac]['away_time']=0
         return results
 
 def ignoredevice(device):
@@ -285,16 +295,15 @@ def task():
   client.unsubscribe("homeassistant/device_tracker/aerohive/#")
   client.on_message = None
   print('purging ignored devices')
+  print(last_results)
   for mac in last_results:
     d=last_results[mac]
     if ignoredevice(d):
       print("purge host: "+d['name'])
       print(d)
       print("     topic: "+   prefixtopic(d))
-      result = client.publish(    prefixtopic(d)+"/config"    , None, retain=1,qos=0)
-      result = client.publish(    prefixtopic(d)+"/attributes", None, retain=1,qos=0)
-      result = client.publish(    prefixtopic(d)+"/state"     , None, retain=1,qos=0)
-      result = client.publish(    prefixtopic(d)              , None, retain=1,qos=0)
+      for key in ['/config','/attributes','/lastseentime','/state','/away_time','']:
+        result = client.publish(    prefixtopic(d)+key, None, retain=1,qos=0)
 
   print('Starting scan loop')
   while True:

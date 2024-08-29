@@ -4,11 +4,11 @@ version: "1.0.5"
 slug: aerohive_tracker
 description: Track WiFi devices accross multiple APs of an Aerohive mesh network.  Only wireless devices are tracked.
 arch:
-  - armhf
-  - armv7
+  #  - armhf
+  #- armv7
   - aarch64
-  - amd64
-  - i386
+  #- amd64
+  #- i386
 options:
   aerohive_password: ""
   aerohive_host: ""
@@ -22,8 +22,8 @@ options:
   ignore_regex_ip: "a^"
   ignore_regex_name: "a^"
   ignore_unnamed_hosts: "True"
-  sleep_interval: "15"
-  away_delay: "300"
+  sleep_interval: 15
+  away_delay: 300
   mqtt_first_reconnect_delay: 1
   mqtt_reconnect_rate: 2
   mqtt_max_reconnect_count: 0
@@ -47,4 +47,3 @@ schema:
   mqtt_reconnect_rate: 'int'
   mqtt_max_reconnect_count: 'int'
   mqtt_max_reconnect_delay: 'int'
-}
