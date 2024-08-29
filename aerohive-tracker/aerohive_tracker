@@ -130,6 +130,7 @@ def publish(client,d):
     # this is retained so you can tell the last AP a device connected to
     d2=d.copy()
     d2.pop('state',None)
+    d2.pop('mac',None)
     d2.pop('lastseentime',None)
     payload=json.dumps(d2)
     result = client.publish(
@@ -292,7 +293,6 @@ def task():
       print("     topic: "+   prefixtopic(d))
       result = client.publish(    prefixtopic(d)+"/config"    , None, retain=1,qos=0)
       result = client.publish(    prefixtopic(d)+"/attributes", None, retain=1,qos=0)
-      result = client.publish(    prefixtopic(d)+"/lastseentime",None, retain=1,qos=0)
       result = client.publish(    prefixtopic(d)+"/state"     , None, retain=1,qos=0)
       result = client.publish(    prefixtopic(d)              , None, retain=1,qos=0)
 

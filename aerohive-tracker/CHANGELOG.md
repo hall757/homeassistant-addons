@@ -1,4 +1,7 @@
 # Changelog
+## 1.0.5
+
+- added away_delay
 
 ## 1.0.4
 
