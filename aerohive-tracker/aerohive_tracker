@@ -1,11 +1,13 @@
 #!/usr/bin/python3
 
-import os,random,aeromiko,time,json,yaml,socket,sys,re
-import paho.mqtt.client as mqtt_client
+import os,random,aeromiko,time,json,yaml,socket,sys,re,pytz
+import paho.mqtt.client  as mqtt_client
 import paho.mqtt.publish as publish
-from datetime import datetime
-from operator import itemgetter
-from pprint import pprint
+from   datetime import datetime
+from   operator import itemgetter
+from   pprint   import pprint
+
+HA_TOPIC="homeassistant/device_tracker/aerohive"
 
 def read_options():
   options={}
@@ -36,7 +38,8 @@ def read_options():
   options.setdefault('mqtt_max_reconnect_count' ,12)
   options.setdefault('mqtt_max_reconnect_delay' ,60)
   options.setdefault('away_delay'              ,300)
-  for key in ['aerohive_host','aerohive_password']:
+  options.setdefault('tz'                      ,'America/New_York')
+  for key in ['aerohive_host','aerohive_password','aerohive_username','mqtt_host','mqtt_password','mqtt_username']:
     if options[key]=='':
       print(key+" cannot be blank.  Terminating...")
       exit()
@@ -45,22 +48,20 @@ def read_options():
 
 def create_discovery_record(topic, device):
     entity_config = {}
-    entity_config['name'] = device['name']
-    entity_config['unique_id'] = device['mac'].replace(":","")+"_aerohive_device_tracker"
-    entity_config['state_topic'] = topic +'/state' 
-    entity_config['json_attributes_topic'] = topic +'/attributes'
-    entity_config['payload_home'] = 'home'
-    entity_config['payload_not_home'] = 'not_home'
-    entity_config['source_type'] = 'router'
-    entity_config['device']={}
-    entity_config['device']['identifiers']='Aerohive'
-    entity_config['device']['name']='Aerohive'
-    #entity_config['device']['connections']=['ap',device['ap']]
-    entity_config['device_class']='device_tracker'
-    entity_config['device']['manufacturer']='Aerohive'
-
+    entity_config['name'                  ] = device['name']
+    entity_config['unique_id'             ] = device['mac'].replace(":","")+"_aerohive_device_tracker"
+    entity_config['state_topic'           ] = topic +'/state' 
+    entity_config['json_attributes_topic' ] = topic +'/attributes'
+    entity_config['payload_home'          ] = 'home'
+    entity_config['payload_not_home'      ] = 'not_home'
+    entity_config['source_type'           ] = 'router'
+    entity_config['device'                ] = {}
+    entity_config['device']['identifiers' ] = 'Aerohive'
+    entity_config['device']['name'        ] = 'Aerohive'
+    entity_config['device_class'          ] = 'device_tracker'
+    entity_config['device']['manufacturer'] = 'Aerohive'
+    #entity_config['device']['connections'] = ['ap',device['ap']]
     return json.dumps(entity_config)
-
 
 def on_disconnect(client, userdata, rc):
     print("Disconnected with result code: "+str(rc))
@@ -74,12 +75,10 @@ def on_disconnect(client, userdata, rc):
             return
         except Exception as err:
             print(str(err)+". Reconnect failed. Retrying...")
-
         reconnect_delay *= options['mqtt_reconnect_rate']
         reconnect_delay = min(reconnect_delay, options['mqtt_max_reconnect_delay'])
         reconnect_count += 1
     print("Reconnect failed after "+str(reconnect_count)+" attempts. Exiting...")
-
 
 def connect_mqtt():
     def on_connect(client, userdata, flags, rc):
@@ -90,13 +89,13 @@ def connect_mqtt():
     # Set Connecting Client ID
     client = mqtt_client.Client(client_id)
     client.username_pw_set(options['mqtt_username'], options['mqtt_password'])
-    client.on_connect = on_connect
+    client.on_connect    = on_connect
     client.on_disconnect = on_disconnect
     client.connect(options["mqtt_host"], options["mqtt_port"] )
     return client
 
 def prefixtopic(device):
-    return "homeassistant/device_tracker/aerohive/0x"+device['mac'].replace(":","")+""
+    return HA_TOPIC+"/0x"+device['mac'].replace(":","")+""
 
 def publish(client,d):
   if d['mac']=='':
@@ -105,41 +104,28 @@ def publish(client,d):
   # public device payload and discovery payload for a device
   global discovery_published
 
-  # always publich home/not_home status for all devices seen since startup
+  # always publish home/not_home status for all devices seen since startup
   # this is not retained
   prefix= prefixtopic(d)
   #print(prefix)
-  result = client.publish(
-      prefix+"/state",
-      d['state'],
-      retain=0,qos=0)
-  result = client.publish(
-      prefix+"/lastseen",
-      None,
-      retain=0,qos=0)
+  result = client.publish( prefix+"/state", d['state'], retain=0,qos=0)
   try:
-      result = client.publish(
-          prefix+"/lastseentime",
-          d['lastseentime'],
-          retain=1,qos=0)
+      result = client.publish( prefix+"/lastseentime", d['lastseentime'], retain=1,qos=0)
   except:  
       None
   #print(result)
-  if d['state']=="home":
-    # only publish device payload when device is home
-    # this is retained so you can tell the last AP a device connected to
-    d2=d.copy()
-    d2.pop('state',None)
-    d2.pop('lastseentime',None)
-    payload=json.dumps(d2)
-    result = client.publish(
-      prefix+"/attributes",
-      payload,
-      retain=1,qos=0)
 
+  d2=d.copy()
+  for key in ['state','lastseentime']:
+      d2.pop(key,None)
+  payload=json.dumps(d2)
+  result = client.publish( prefix+"/attributes", payload, retain=1,qos=0)
+
+  if d['state']=="home":
     # remove highly volitile keys from payload in discovery record
     d2=d.copy()
-    d2.pop('lastseen',None)
+    for key in ['lastseen','lastseentime','away_time']:
+      d2.pop(key,None)
     payload=json.dumps(d2)
 
     # publish the discovery record only when device payload changes
@@ -148,12 +134,6 @@ def publish(client,d):
       result = client.publish(
         prefix+"/config",create_discovery_record(prefix,d),retain=1,qos=0)
       discovery_published[d['mac']]=payload
-    # result: [0, 1]
-    #status = result[0]
-    #if status == 0:
-    #    print(f"Send home to topic {topic}/{mac}")
-    #else:
-    #    print(f"Failed to send message to topic {topic}")  
 
 def scan_devices():
         global last_results
@@ -196,20 +176,20 @@ def _get_update():
             away_time = int(datetime.now().timestamp()) - results[key]['lastseen']
           except:
             away_time = options['away_delay']+1
+          last_results[key]['away_time']=away_time
           results[key]['away_time']=away_time
           if away_time > options['away_delay']:
             results[key]['state']='not_home'
         for host in aerohive_hosts: # For each host
-          #print("scanning ap "+host)
           try:
             ap_hostname=socket.gethostbyaddr(host)[0]
           except:
             ap_hostname=host
           if not connected[host]: # If not already connected
-            _connect() # Attempt to connect
+            _connect()            # Attempt to connect
           if connected[host]:
             for station in aps[host].show_station(): # for each wireless stations connected to AP
-              ip     = station['IP_ADDR' ] # record ip and mac
+              ip     = station['IP_ADDR' ]           # record ip and mac
               if ip != '0.0.0.0':
                 octets = station['MAC_ADDR']
                 mac    = octets[0:2]+':'+octets[2:7]+':'+octets[7:12]+':'+octets[12:14]
@@ -217,30 +197,32 @@ def _get_update():
                   """Return only up to the first dot, unless returned name is the IP"""
                   hostname=socket.gethostbyaddr(ip)[0] # Try and resolve hostname 
                   if hostname != ip:
-                    hostname=hostname.split('.')[0] # store resolved hostname in record
+                    hostname=hostname.split('.')[0]    # store resolved hostname in record
                 except:
                   hostname=None # hostname could not be resolved from IP
                 """Store the mac and associated hostname in the result"""  
                 if ((mac != '') and True): #hostname != ip:
                   results[mac]={ 'name':hostname }
-                  results[mac]['ip']=ip
-                  results[mac]['ap']=ap_hostname
-                  results[mac]['mac']=mac
+                  results[mac]['ip'   ]=ip
+                  results[mac]['ap'   ]=ap_hostname
+                  results[mac]['mac'  ]=mac
                   results[mac]['state']='home'
-                  nowtime=datetime.now()
-                  results[mac]['lastseentime']=nowtime.strftime("%m/%d/%Y, %H:%M:%S")
-                  results[mac]['lastseen']=int(nowtime.timestamp())
-                  results[mac]['away_time']=0
+                  results[mac]['lastseentime']=datetime.now(pytz.timezone(options['tz'])).strftime("%m/%d/%Y, %H:%M:%S")
+                  results[mac]['lastseen'    ]=int(datetime.now().timestamp())
+                  results[mac]['away_time'   ]=0
         return results
 
 def ignoredevice(device):
     ignore=False
-    if (re.match(ignore_regex_mac ,device['mac' ])!=None):
-      ignore=True
-    if (re.match(ignore_regex_name,device['name'])!=None):
-      ignore=True
-    if (re.match(ignore_regex_ip  ,device['ip'  ])!=None):
-      ignore=True
+    for key in ['mac','name','ip']:
+      if (re.match(ignore_regex[key],device[key])!=None):
+        ignore=True
+    #if (re.match(ignore_regex_mac ,device['mac' ])!=None):
+    #  ignore=True
+    #if (re.match(ignore_regex_name,device['name'])!=None):
+    #  ignore=True
+    #if (re.match(ignore_regex_ip  ,device['ip'  ])!=None):
+    #  ignore=True
     if (options['ignore_unnamed_hosts'] and (device['ip']==device['name'])):
       ignore=True
     #if (device['ip']=='unknown'): # handle a pre staged mac
@@ -258,13 +240,8 @@ def update_mqtt(client,devices):
 def seed_mac(mac):
   global last_results
   print('Seeding '+mac)
-  last_results[mac]={
-    "mac":mac,
-    "state":"not_home",
-    "name":"unknown",
-    "ip":"unknown",
-    "ap":"unknown"
-  }
+  u='unknown'
+  last_results[mac]={"mac":mac,"state":"not_home","name":u,"ip":u,"ap":u}
 
 def on_message(client, userdata, msg):
   global last_results
@@ -275,6 +252,18 @@ def on_message(client, userdata, msg):
   except:
     mac=''
 
+def purge_ignored_devices():
+  global last_results
+  print('purging ignored devices')
+  for mac in last_results:
+    d=last_results[mac]
+    if ignoredevice(d):
+      print("purge host: "+d['name'])
+      print(d)
+      print("     topic: "+prefixtopic(d))
+      for key in ['/config','/attributes','/lastseentime','/state','/away_time','']:
+        result = client.publish( prefixtopic(d)+key,None,retain=0,qos=0)
+
 def task():
   global scanned_devices
   global last_results
@@ -282,9 +271,8 @@ def task():
   try:
     client = connect_mqtt()
     client.on_message = on_message
-    client.subscribe("homeassistant/device_tracker/aerohive/#")
+    client.subscribe(HA_TOPIC+"/#")
     client.loop_start()
-    
   except:
     print("Failed to connect to mqtt broker "+options["mqtt_host"]+":"+str(options["mqtt_port"])+".  Exiting...")
     return
@@ -292,18 +280,9 @@ def task():
   for host in aerohive_hosts: # initialize conncted stats
     connected[host]=False
   _connect() # connect to all APs
-  client.unsubscribe("homeassistant/device_tracker/aerohive/#")
+  client.unsubscribe(HA_TOPIC+"/#")
   client.on_message = None
-  print('purging ignored devices')
-  print(last_results)
-  for mac in last_results:
-    d=last_results[mac]
-    if ignoredevice(d):
-      print("purge host: "+d['name'])
-      print(d)
-      print("     topic: "+   prefixtopic(d))
-      for key in ['/config','/attributes','/lastseentime','/state','/away_time','']:
-        result = client.publish(    prefixtopic(d)+key, None, retain=1,qos=0)
+  purge_ignored_devices()
 
   print('Starting scan loop')
   while True:
@@ -317,9 +296,12 @@ print("")
 print("----- starting -----")
 options            = read_options()
 aerohive_hosts     = options['aerohive_host'].split(',')
-ignore_regex_mac   = re.compile(options['ignore_regex_mac' ])
-ignore_regex_ip    = re.compile(options['ignore_regex_ip'  ])
-ignore_regex_name  = re.compile(options['ignore_regex_name'])
+ignore_regex={}
+for key in ['mac','ip','name']:
+    ignore_regex[key]=re.compile(options['ignore_regex_'+key])
+#ignore_regex_mac   = re.compile(options['ignore_regex_mac' ])
+#ignore_regex_ip    = re.compile(options['ignore_regex_ip'  ])
+#ignore_regex_name  = re.compile(options['ignore_regex_name'])
 aps                = {} # keys=mac, values=AP
 connected          = {} # keys=mac, values=boolean
 client_id          = f'python-mqtt-{random.randint(0, 1000)}'

@@ -52,4 +52,7 @@ configuration:
   mqtt_max_reconnect_delay:
     name: MQTT max reconnect delay
     description: MQTT tuning parameter
+  tz:
+    name: Time Zone.  Defaults to America/New_York
+    description: Time Zone for lastseentime attribute
 

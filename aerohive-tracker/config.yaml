@@ -1,14 +1,14 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
 name: Aerohive Device Tracker
-version: "1.0.5"
+version: "1.0.6"
 slug: aerohive_tracker
 description: Track WiFi devices accross multiple APs of an Aerohive mesh network.  Only wireless devices are tracked.
 arch:
-  #  - armhf
-  #- armv7
+  - armhf
+  - armv7
   - aarch64
-  #- amd64
-  #- i386
+  - amd64
+  - i386
 options:
   aerohive_password: ""
   aerohive_host: ""
@@ -28,6 +28,7 @@ options:
   mqtt_reconnect_rate: 2
   mqtt_max_reconnect_count: 0
   mqtt_max_reconnect_delay: 60
+  tz: "America/New_York"
 schema:
   aerohive_password: 'password'
   aerohive_host: 'str'
@@ -47,3 +48,4 @@ schema:
   mqtt_reconnect_rate: 'int'
   mqtt_max_reconnect_count: 'int'
   mqtt_max_reconnect_delay: 'int'
+  tz: 'str'

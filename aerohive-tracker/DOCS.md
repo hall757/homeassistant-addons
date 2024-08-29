@@ -35,8 +35,8 @@ Author: Randy Hall [randy.hall@open-source.guru](mailto:randy.hall@open-source.g
 | ignore_regex_ip      | a^                      | Regular expression to ignore IP addresses. Optionsl          |
 | ignore_regex_name    | a^                      | Regular expression to ignore device names. Optional          |
 | ignore_unnamed_hosts | True                    | If a reverse DNS lookup of a client IP address does not return a name and this value is True, the client will be excluded from reporting. |
-| sleep_interval       | 30                      | he number of seconds to wait between each scan and report cycle. |
-
+| sleep_interval       | 30                      | the number of seconds to wait between each scan and report cycle. |
+| tz                   | America/New_York        | time zone |
 
 ## How to use
 
