@@ -252,7 +252,7 @@ def on_message(client, userdata, msg):
   except:
     mac=''
 
-def purge_ignored_devices():
+def purge_ignored_devices(client):
   global last_results
   print('purging ignored devices')
   for mac in last_results:
@@ -282,7 +282,7 @@ def task():
   _connect() # connect to all APs
   client.unsubscribe(HA_TOPIC+"/#")
   client.on_message = None
-  purge_ignored_devices()
+  purge_ignored_devices(client)
 
   print('Starting scan loop')
   while True:

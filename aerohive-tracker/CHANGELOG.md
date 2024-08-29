@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.7
+
+- fixed device cleanup
+
 ## 1.0.6
 
 - added time zone
